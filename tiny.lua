@@ -522,96 +522,95 @@ end
 
 -- Adds and removes Systems that have been marked from the World.
 function tiny_manageSystems(world)
-    local s2a, s2r = world.systemsToAdd, world.systemsToRemove
+    -- Loop while there are still systems to add; systems' `onAddToWorld`
+    -- and `onRemoveFromWorld` callbacks may themselves add or remove
+    -- systems.
+    while #world.systemsToAdd + #world.systemsToRemove > 0 do
+        local s2a, s2r = world.systemsToAdd, world.systemsToRemove
+    
+        world.systemsToAdd = {}
+        world.systemsToRemove = {}
 
-    -- Early exit
-    if #s2a == 0 and #s2r == 0 then
-        return
-    end
+        local worldEntityList = world.entities
+        local systems = world.systems
 
-    world.systemsToAdd = {}
-    world.systemsToRemove = {}
-
-    local worldEntityList = world.entities
-    local systems = world.systems
-
-    -- Remove Systems
-    for i = 1, #s2r do
-        local system = s2r[i]
-        local index = system.index
-        local onRemove = system.onRemove
-        if onRemove and not system.nocache then
-            local entityList = system.entities
-            for j = 1, #entityList do
-                onRemove(system, entityList[j])
-            end
-        end
-        tremove(systems, index)
-        for j = index, #systems do
-            systems[j].index = j
-        end
-        local onRemoveFromWorld = system.onRemoveFromWorld
-        if onRemoveFromWorld then
-            onRemoveFromWorld(system, world)
-        end
-        s2r[i] = nil
-
-        -- Clean up System
-        system.world = nil
-        system.entities = nil
-        system.indices = nil
-        system.index = nil
-    end
-
-    -- Add Systems
-    for i = 1, #s2a do
-        local system = s2a[i]
-        if systems[system.index or 0] ~= system then
-            if not system.nocache then
-                system.entities = {}
-                system.indices = {}
-            end
-            if system.active == nil then
-                system.active = true
-            end
-            system.modified = true
-            system.world = world
-            local index = #systems + 1
-            system.index = index
-            systems[index] = system
-            local onAddToWorld = system.onAddToWorld
-            if onAddToWorld then
-                onAddToWorld(system, world)
-            end
-
-            -- Try to add Entities
-            if not system.nocache then
+        -- Remove Systems
+        for i = 1, #s2r do
+            local system = s2r[i]
+            local index = system.index
+            local onRemove = system.onRemove
+            if onRemove and not system.nocache then
                 local entityList = system.entities
-                local entityIndices = system.indices
-                local onAdd = system.onAdd
-                local filter = system.filter
-                if filter then
-                    for j = 1, #worldEntityList do
-                        local entity = worldEntityList[j]
-                        if filter(system, entity) then
-                            local entityIndex = #entityList + 1
-                            entityList[entityIndex] = entity
-                            entityIndices[entity] = entityIndex
-                            if onAdd then
-                                onAdd(system, entity)
+                for j = 1, #entityList do
+                    onRemove(system, entityList[j])
+                end
+            end
+            tremove(systems, index)
+            for j = index, #systems do
+                systems[j].index = j
+            end
+            local onRemoveFromWorld = system.onRemoveFromWorld
+            if onRemoveFromWorld then
+                onRemoveFromWorld(system, world)
+            end
+            s2r[i] = nil
+
+            -- Clean up System
+            system.world = nil
+            system.entities = nil
+            system.indices = nil
+            system.index = nil
+        end
+
+        -- Add Systems
+        for i = 1, #s2a do
+            local system = s2a[i]
+            if systems[system.index or 0] ~= system then
+                if not system.nocache then
+                    system.entities = {}
+                    system.indices = {}
+                end
+                if system.active == nil then
+                    system.active = true
+                end
+                system.modified = true
+                system.world = world
+                local index = #systems + 1
+                system.index = index
+                systems[index] = system
+                local onAddToWorld = system.onAddToWorld
+                if onAddToWorld then
+                    onAddToWorld(system, world)
+                end
+
+                -- Try to add Entities
+                if not system.nocache then
+                    local entityList = system.entities
+                    local entityIndices = system.indices
+                    local onAdd = system.onAdd
+                    local filter = system.filter
+                    if filter then
+                        for j = 1, #worldEntityList do
+                            local entity = worldEntityList[j]
+                            if filter(system, entity) then
+                                local entityIndex = #entityList + 1
+                                entityList[entityIndex] = entity
+                                entityIndices[entity] = entityIndex
+                                if onAdd then
+                                    onAdd(system, entity)
+                                end
                             end
                         end
                     end
                 end
             end
+            s2a[i] = nil
         end
-        s2a[i] = nil
     end
 end
 
 -- Adds, removes, and changes Entities that have been marked.
 function tiny_manageEntities(world)
-
     local e2r = world.entitiesToRemove
     local e2c = world.entitiesToChange
 
